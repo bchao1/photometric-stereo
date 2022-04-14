@@ -73,7 +73,7 @@ def plot_surface(Z, dataset, show_plot=True):
     
     surf = ax.plot_surface(x, y, -Z, facecolors=color_shade, rstride=4, cstride=4)
     if dataset == "women":
-        ax.view_init(elev=30, azim=120)
+        ax.view_init(elev=0, azim=120)
     elif dataset == "cat":
         ax.view_init(elev=50, azim=120)
     elif dataset == "frog":
@@ -231,13 +231,17 @@ def surface_integration(N, h, w, mode="poisson"):
 def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True):
     B, L = solve_svd(I)
 
+    B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
+
     # Do some processing on B, L (resolving GBR ambiguity)
-    if optimize_gbr:
-        B, L, G = optimize_albedos(B, L) # B = G^(-T) @ B
+    if optimize_gbr is not None:
+        if optimize_gbr == "coarse_to_fine":
+            B, L, G = optimize_albedos_coarse_to_fine(B, L) # B = G^(-T) @ B
+        elif optimize_gbr == "brute_force":
+            B, L, G = optimize_albedos_brute_force(B, L)
     else:
         G = np.eye(3) # GBR is just identity
 
-    B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
     A, N = get_A_N_from_B(B)
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
 
@@ -279,13 +283,44 @@ def get_best_gbr_centers(B, t, m_range, v_range, l_range):
     m_range_new = (m_edges[m_best_i], m_edges[m_best_i + 1])
     v_range_new = (v_edges[v_best_i], v_edges[v_best_i + 1])
     l_range_new = (l_edges[l_best_i], l_edges[l_best_i + 1])
+    print(min_entropy)
     return m_range_new, v_range_new, l_range_new
 
-def optimize_albedos(B, L, t=2, levels=10, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
+def optimize_albedos_brute_force(B, L, t=5, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
+    ms = np.linspace(m_range[0], m_range[1], t)
+    vs = np.linspace(v_range[0], v_range[1], t)
+    ls = np.linspace(l_range[0]+1e-8, l_range[1], t) # prevent singular value
+    m_best, v_best, l_best = None, None, None
+    min_entropy = np.inf
+    i = 0
+    for m in ms:
+        for v in vs:
+            for l in ls:
+                G = get_gbr(m, v, l)
+                B_gbr = np.linalg.inv(G).T @ B # scale by GBR transform
+                A_gbr, N_gbr = get_A_N_from_B(B_gbr)
+                entropy = compute_albedo_entropy(A_gbr)
+                #print(f"Iter {i}: {entropy}")
+                if entropy < min_entropy:
+                    print(f"Iter {i}: {entropy}")
+                    min_entropy = entropy
+                    m_best, v_best, l_best = m, v, l
+                i += 1
+
+    G = get_gbr(m_best, v_best, l_best)
+    B = np.linalg.inv(G).T @ B # scale by GBR transform
+    L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
+    #B = GBR_flip @ B # or not
+    print(G)
+    return B, L, G
+
+
+def optimize_albedos_coarse_to_fine(B, L, t=2, levels=5, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
     opt_seq = []
     for level in range(levels):
         print(f"Optimizing albedo level {level} ...")
         m_range, v_range, l_range = get_best_gbr_centers(B, t, m_range, v_range, l_range)
+        #print(m_range, v_range, l_range)
     
     m = (m_range[0] + m_range[1]) / 2
     v = (v_range[0] + v_range[1]) / 2
@@ -304,32 +339,36 @@ config = {
         "optimize": True
     },
     "women": {
-        "sigma": 2,
+        "sigma": 10,
         "integration": "poisson",
         "optimize": True
     },
-    "frog": {
+    "frog": { # weird behavior
         "sigma": 5,
         "integration": "poisson",
         "optimize": True
     }
 }
 
-dataset = "cat"
+dataset = "women"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=True)
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr="coarse_to_fine")
 img = plot_surface(Z, dataset=dataset)
 
-A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+#B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
+#    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
+#img = plot_surface(Z, dataset=dataset)
+
+#A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 
 #plt.imshow(Z_normalized, cmap="gray")
 #plt.show()
 #save_image(normalize(I[0].reshape(h, w)), "orig.png")
 #save_image(A_normalized, "albedo.png")
 #save_image(N_normalized, "normal.png")
-#save_image(Z_normalized, "depth.png")
+#save_image(Z_normalized, "./results/depth.png")
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

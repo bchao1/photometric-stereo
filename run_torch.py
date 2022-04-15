@@ -239,7 +239,7 @@ def surface_integration(N, h, w, mode="poisson"):
 
 def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True):
     if torch.cuda.is_available():
-        torch.cuda().set_device(gpu_id)
+        torch.cuda.set_device(gpu_id)
         I = I.cuda()
 
     B, L = solve_svd(I)
@@ -270,7 +270,7 @@ def get_gbr(m, v, l, device):
     return G
 
 def compute_albedo_entropy(A, bins=256):
-    cnt, _ = torch.histogram(A, bins=bins)
+    cnt, _ = torch.histogram(A.cpu(), bins=bins)
     p = cnt / cnt.sum()
     logp = torch.log(p + 1e-10)
     entropy = -(p * logp).sum() # add small value for numerical stability

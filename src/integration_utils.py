@@ -1,10 +1,11 @@
 #!/usr/bin/python
-""" This is a module for photometric stereo homework (15-463/663/862, Computational Photography, Fall 2020, CMU).
+""" 
+The code is borrowed from the photometric stereo homework 
+of the following course at CMU:
 
-You can import necessary functions into your code as follows:
-from cp_hw5 import integrate_poisson, integrate_frankot, load_sources
+(15-463/663/862, Computational Photography, Fall 2020, CMU).
+
 """
-
 import numpy as np
 from scipy.fftpack import dct, idct
 

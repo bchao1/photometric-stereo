@@ -19,8 +19,9 @@ This repo implements some photometric stereo algorithms. The algorithms can be f
 An implementation in `pytorch` is also provided.
 |Dataset|Numpy|Pytorch|
 |--|--|--|
-|cat|47.672s||
-|women|45.056s||
+|cat|47.672s|17.282s|
+|women|45.056s|18.270s|
+
 
 # Todo
 - Coarse to fine refinement

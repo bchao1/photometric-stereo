@@ -310,7 +310,6 @@ def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l
     #print(B)
     #exit()
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    B = GBR_flip.to(B.device) @ B # or not
     print(G)
     return B, L, G
 
@@ -376,7 +375,7 @@ config = {
     }
 }
 
-dataset = "cat"
+dataset = "women"
 optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)

@@ -186,7 +186,7 @@ def integratibility_normalization(B, L, h, w, sigma=2):
         [-x[2], x[5], 1],
         [x[1], -x[4], 0],
         [-x[0], x[3], 0]
-    ]).float()
+    ]).float().to(B.device)
     B = torch.linalg.inv(D) @ B
     L = D.T @ L
     return B, L
@@ -283,7 +283,7 @@ def optimize_albedos(B, L, optimize_gbr):
         elif optimize_gbr == "brute_force":
             B, L, G = optimize_albedos_brute_force(B, L)
     else:
-        G = np.eye(3) # GBR is just identity
+        G = torch.eye(3) # GBR is just identity
     return B, L, G
 
 # need to partition very small
@@ -309,7 +309,7 @@ def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l
                     m_best, v_best, l_best = m, v, l
                 i += 1
 
-    G = get_gbr(m_best, v_best, l_best)
+    G = get_gbr(m_best, v_best, l_best, B.device)
     #print(np.linalg.inv(G).T)
     #exit()
     B = torch.linalg.inv(G).T @ B # scale by GBR transfo rm
@@ -401,13 +401,13 @@ B, L, A, N, Z, G = solve_photometric_stereo(I, h, w,
 img = plot_surface(Z, title="not optimized", dataset=dataset)
 img.save(f"./results/not_optimized_{dataset}.png")
 
-#A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 
 #plt.imshow(Z_normalized, cmap="gray")
 #plt.show()
 #save_image(normalize(I[0].reshape(h, w)), "orig.png")
-#save_image(A_normalized, "albedo.png")
-#save_image(N_normalized, "normal.png")
-#save_image(Z_normalized, "./results/depth.png")
+save_image(A_normalized, "./results/albedo.png")
+save_image(N_normalized, "./results/normal.png")
+save_image(Z_normalized, "./results/depth.png")
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

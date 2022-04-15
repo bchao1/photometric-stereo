@@ -8,15 +8,20 @@ import matplotlib.animation as animation
 import scipy.ndimage
 from skimage.transform import resize
 import torch
+import torchvision
+import torch.nn.functional as F
+import time
 
 
 from src.cp_hw5 import integrate_poisson, integrate_frankot
+from src.custom_torch_utils import gaussian_2d
 
-GBR_flip = np.array([
+GBR_flip = torch.tensor([
     [1, 0, 0],
     [0, 1, 0],
     [0, 0, -1]
 ])
+gpu_id = 0
 
 def save_image(img, img_path):
     img = (img * 255).astype(np.uint8)
@@ -39,8 +44,8 @@ def read_image(img_path):
     return img
 
 def normalize(arr):
-    _min = np.min(arr.ravel())
-    _max = np.max(arr.ravel())
+    _min = torch.min(arr.flatten())
+    _max = torch.max(arr.flatten())
     return (arr - _min) / (_max - _min)
 
 def get_luminance(img):
@@ -135,13 +140,11 @@ def solve_svd(I):
 
     rank = 3
     U, S, VH = torch.linalg.svd(I, full_matrices=False)
-    print(U.shape, S.shape, VH.shape)
-    exit()
-    L_t = U[:, :rank] @ np.diag(np.sqrt(S[:rank]))
-    B = np.diag(np.sqrt(S[:rank])) @ VH[:rank, :] # Pseudo-normal matrix
+    L_t = U[:, :rank] @ torch.diag(torch.sqrt(S[:rank]))
+    B = torch.diag(torch.sqrt(S[:rank])) @ VH[:rank, :] # Pseudo-normal matrix
     L = L_t.T # light matrix (3, N)
     
-    return B, L
+    return B.float(), L.float()
 
 def naive_normalization(B, L):
     """
@@ -158,13 +161,14 @@ def naive_normalization(B, L):
 def integratibility_normalization(B, L, h, w, sigma=2):
 
     B = B.reshape(-1, h, w) # (3, h, w)
-    B_gradx = np.zeros_like(B)
-    B_grady = np.zeros_like(B)
-    for i in range(B.shape[0]):
-        B_blurred = scipy.ndimage.gaussian_filter(B[i], sigma)
-        B_grady[i], B_gradx[i] = np.gradient(B_blurred, axis=(0, 1)) # tricky!
+    
+    B_blurred = gaussian_2d(B, sigma)
+    B_gradx = F.pad(torch.diff(B_blurred, dim=2), (0, 1, 0, 0, 0, 0)).to(B.device)
+    B_grady = F.pad(torch.diff(B_blurred, dim=1), (0, 0, 0, 1, 0, 0)).to(B.device)
+
     B_gradx = B_gradx.reshape(B.shape[0], -1) # (3, H*W)
     B_grady = B_grady.reshape(B.shape[0], -1) # (3, H*W)
+
     B = B.reshape(B.shape[0], -1) # (3, H*W)
     
     A1 = B[0] * B_gradx[1] - B[1] * B_gradx[0]
@@ -173,27 +177,24 @@ def integratibility_normalization(B, L, h, w, sigma=2):
     A4 = -B[0] * B_grady[1] + B[1] * B_grady[0]
     A5 = -B[0] * B_grady[2] + B[2] * B_grady[0]
     A6 = -B[1] * B_grady[2] + B[2] * B_grady[1]
-    A = np.stack([A1, A2, A3, A4, A5, A6]).T
+    A = torch.stack([A1, A2, A3, A4, A5, A6]).T
 
-    U, S, VH = np.linalg.svd(A, full_matrices=False)
+    U, S, VH = torch.linalg.svd(A, full_matrices=False)
     # which one is x?
     x = VH[-1] # right singular vector corresponding to smallest singular value
-    D = np.array([
+    D = torch.tensor([
         [-x[2], x[5], 1],
         [x[1], -x[4], 0],
         [-x[0], x[3], 0]
-    ])
-    B = np.linalg.inv(D) @ B
+    ]).float()
+    B = torch.linalg.inv(D) @ B
     L = D.T @ L
     return B, L
 
 def get_A_N_from_B(B):
     # Note that normals may face "inwards"
-    A = np.linalg.norm(B, ord=2, axis=0)
-    #print("A", A)
-    N = B / np.expand_dims(A, 0) # Normal (unit vector)
-    #print(A)
-    #exit()
+    A = torch.norm(B, p=2, dim=0)
+    N = B / A.unsqueeze(0) # Normal (unit vector)
     return A, N
 
 def normalize_A_N_Z(A, N, Z):
@@ -202,7 +203,7 @@ def normalize_A_N_Z(A, N, Z):
 
     N = N.reshape(-1, h, w)
     N_normalized = (N + 1) / 2 # for visualization
-    N_normalized = np.transpose(N_normalized, (1, 2, 0))
+    N_normalized = torch.permute(N_normalized, (1, 2, 0))
 
     Z_normalized = normalize(Z)
     return A_normalized, N_normalized, Z_normalized
@@ -222,7 +223,7 @@ def read_images_from_folder(data_folder, samples=None):
         elif len(img.shape) == 2:
             I.append(img.ravel())
     I = np.stack(I) # I.shape = (N, H * W) = (N, P)
-    I = torch.tensor(I) # cast to torch tensor
+    I = torch.tensor(I).float() # cast to torch tensor
     return I, (h, w)
 
 def surface_integration(N, h, w, mode="poisson"):
@@ -237,6 +238,10 @@ def surface_integration(N, h, w, mode="poisson"):
     return Z
 
 def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True):
+    if torch.cuda.is_available():
+        torch.cuda().set_device(gpu_id)
+        I = I.cuda()
+
     B, L = solve_svd(I)
 
     B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
@@ -244,24 +249,32 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L, G = optimize_albedos(B, L, optimize_gbr)
 
     A, N = get_A_N_from_B(B)
+
+    # Cast to numpy
+    B = B.detach().cpu().numpy()
+    L = L.detach().cpu().numpy()
+    A = A.detach().cpu().numpy()
+    N = N.detach().cpu().numpy()
+    G = G.detach().cpu().numpy()
+
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
 
     return B, L, A, N, Z, G
 
-def get_gbr(m, v, l):
-    G = np.array([
+def get_gbr(m, v, l, device):
+    G = torch.tensor([
         [1, 0, 0],
         [0, 1, 0],
         [m, v, l]
-    ])
+    ]).float().to(device)
     return G
 
 def compute_albedo_entropy(A, bins=256):
-    cnt, _ = np.histogram(A, bins=bins)
+    cnt, _ = torch.histogram(A, bins=bins)
     p = cnt / cnt.sum()
-    logp = np.log(p + 1e-10)
+    logp = torch.log(p + 1e-10)
     entropy = -(p * logp).sum() # add small value for numerical stability
-    return entropy
+    return entropy.item() # return scalar
 
 def optimize_albedos(B, L, optimize_gbr):
     if optimize_gbr is not None:
@@ -275,17 +288,17 @@ def optimize_albedos(B, L, optimize_gbr):
 
 # need to partition very small
 def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
-    ms = np.linspace(m_range[0], m_range[1], t)
-    vs = np.linspace(v_range[0], v_range[1], t)
-    ls = np.linspace(l_range[0]+1e-8, l_range[1], t) # prevent singular value
+    ms = torch.linspace(m_range[0], m_range[1], t).to(B.device)
+    vs = torch.linspace(v_range[0], v_range[1], t).to(B.device)
+    ls = torch.linspace(l_range[0]+1e-8, l_range[1], t).to(B.device) # prevent singular value
     m_best, v_best, l_best = None, None, None
     min_entropy = np.inf
     i = 0
     for m in ms:
         for v in vs:
             for l in ls:
-                G = get_gbr(m, v, l)
-                B_gbr = np.linalg.inv(G).T @ B # scale by GBR transform
+                G = get_gbr(m, v, l, B.device)
+                B_gbr = torch.linalg.inv(G).T @ B # scale by GBR transform
                 A_gbr, N_gbr = get_A_N_from_B(B_gbr)
                 entropy = compute_albedo_entropy(A_gbr)
                 #print(f"Iter {i}: {entropy}")
@@ -299,7 +312,7 @@ def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l
     G = get_gbr(m_best, v_best, l_best)
     #print(np.linalg.inv(G).T)
     #exit()
-    B = np.linalg.inv(G).T @ B # scale by GBR transfo rm
+    B = torch.linalg.inv(G).T @ B # scale by GBR transfo rm
     #print(B)
     #exit()
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
@@ -374,8 +387,12 @@ optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
 
+time_start = time.time()
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
     config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
+time_spent = time.time() - time_start
+print("Time elapsed:", time_spent)
+
 img = plot_surface(Z, title="optimized", dataset=dataset)
 img.save(f"./results/optimized_{dataset}.png")
 

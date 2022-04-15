@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import scipy.ndimage
 from skimage.transform import resize
+import time
 
 
 from src.cp_hw5 import integrate_poisson, integrate_frankot
@@ -369,8 +370,12 @@ optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
 
+time_start = time.time()
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
     config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
+time_spent = time.time() - time_start
+print("Time elapsed:", time_spent)
+exit()
 img = plot_surface(Z, title="optimized", dataset=dataset)
 img.save(f"./results/optimized_{dataset}.png")
 

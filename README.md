@@ -13,6 +13,12 @@ This repo implements some photometric stereo algorithms. The algorithms can be f
 ## Resolving GBR ambiguity
 ![gbr](./results/gbr_comparison.gif)
 
+## GPU speedup
+An implementation in `pytorch` is also provided.
+|Numpy|Pytorch|
+|--|--|
+|47s|16s|
+
 # Todo
 - Coarse to fine refinement
 - Paper: Reflections on the Generalized Bas-Relief Ambiguity

@@ -388,12 +388,12 @@ time_spent = time.time() - time_start
 print("Time elapsed:", time_spent)
 
 img = plot_surface(Z, title="optimized", dataset=dataset)
-img.save(f"./results/optimized_{dataset}.png")
+img.save(f"./results/torch/optimized_{dataset}.png")
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
     config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
 img = plot_surface(Z, title="not optimized", dataset=dataset)
-img.save(f"./results/not_optimized_{dataset}.png")
+img.save(f"./results/torch/not_optimized_{dataset}.png")
 
 A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -torch.tensor(Z))
 
@@ -401,8 +401,8 @@ A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -torch.tensor(Z
 #plt.show()
 #save_image(normalize(I[0].reshape(h, w)), "orig.png")
 
-save_image(A_normalized.cpu().numpy(), "./results/albedo.png")
-save_image(N_normalized.cpu().numpy(), "./results/normal.png")
-save_image(Z_normalized.cpu().numpy(), "./results/depth.png")
+save_image(A_normalized.cpu().numpy(), "./results/torch/albedo.png")
+save_image(N_normalized.cpu().numpy(), "./results/torch/normal.png")
+save_image(Z_normalized.cpu().numpy(), "./results/torch/depth.png")
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

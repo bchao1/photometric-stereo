@@ -365,7 +365,7 @@ config = {
     }
 }
 
-dataset = "cat"
+dataset = "women"
 optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
@@ -375,22 +375,21 @@ B, L, A, N, Z, G = solve_photometric_stereo(I, h, w,
     config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
 time_spent = time.time() - time_start
 print("Time elapsed:", time_spent)
-exit()
 img = plot_surface(Z, title="optimized", dataset=dataset)
-img.save(f"./results/optimized_{dataset}.png")
+img.save(f"./results/numpy/optimized_{dataset}.png")
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
     config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
 img = plot_surface(Z, title="not optimized", dataset=dataset)
-img.save(f"./results/not_optimized_{dataset}.png")
+img.save(f"./results/numpy/not_optimized_{dataset}.png")
 
-#A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 
 #plt.imshow(Z_normalized, cmap="gray")
 #plt.show()
 #save_image(normalize(I[0].reshape(h, w)), "orig.png")
-#save_image(A_normalized, "albedo.png")
-#save_image(N_normalized, "normal.png")
-#save_image(Z_normalized, "./results/depth.png")
+save_image(A_normalized, "./results/numpy/albedo.png")
+save_image(N_normalized, "./results/numpy/normal.png")
+save_image(Z_normalized, "./results/numpy/depth.png")
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

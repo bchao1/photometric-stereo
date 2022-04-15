@@ -73,7 +73,7 @@ def plot_surface(Z, dataset, show_plot=True):
     
     surf = ax.plot_surface(x, y, -Z, facecolors=color_shade, rstride=4, cstride=4)
     if dataset == "women":
-        ax.view_init(elev=0, azim=120)
+        ax.view_init(elev=30, azim=120)
     elif dataset == "cat":
         ax.view_init(elev=50, azim=120)
     elif dataset == "frog":
@@ -186,7 +186,10 @@ def integratibility_normalization(B, L, h, w, sigma=2):
 def get_A_N_from_B(B):
     # Note that normals may face "inwards"
     A = np.linalg.norm(B, ord=2, axis=0)
+    #print("A", A)
     N = B / np.expand_dims(A, 0) # Normal (unit vector)
+    #print(A)
+    #exit()
     return A, N
 
 def normalize_A_N_Z(A, N, Z):
@@ -232,15 +235,8 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L = solve_svd(I)
 
     B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
-
     # Do some processing on B, L (resolving GBR ambiguity)
-    if optimize_gbr is not None:
-        if optimize_gbr == "coarse_to_fine":
-            B, L, G = optimize_albedos_coarse_to_fine(B, L) # B = G^(-T) @ B
-        elif optimize_gbr == "brute_force":
-            B, L, G = optimize_albedos_brute_force(B, L)
-    else:
-        G = np.eye(3) # GBR is just identity
+    B, L, G = optimize_albedos(B, L, optimize_gbr)
 
     A, N = get_A_N_from_B(B)
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
@@ -257,9 +253,54 @@ def get_gbr(m, v, l):
 
 def compute_albedo_entropy(A, bins=256):
     cnt, _ = np.histogram(A, bins=bins)
-    p = cnt / np.prod(A.shape)
-    entropy = -(p * np.log(p + 1e-8)).sum() # add small value for numerical stability
+    p = cnt / cnt.sum()
+    logp = np.log(p + 1e-10)
+    entropy = -(p * logp).sum() # add small value for numerical stability
     return entropy
+
+def optimize_albedos(B, L, optimize_gbr):
+    if optimize_gbr is not None:
+        if optimize_gbr == "coarse_to_fine":
+            B, L, G = optimize_albedos_coarse_to_fine(B, L) # B = G^(-T) @ B
+        elif optimize_gbr == "brute_force":
+            B, L, G = optimize_albedos_brute_force(B, L)
+    else:
+        G = np.eye(3) # GBR is just identity
+    return B, L, G
+
+# need to partition very small
+def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
+    ms = np.linspace(m_range[0], m_range[1], t)
+    vs = np.linspace(v_range[0], v_range[1], t)
+    ls = np.linspace(l_range[0]+1e-8, l_range[1], t) # prevent singular value
+    m_best, v_best, l_best = None, None, None
+    min_entropy = np.inf
+    i = 0
+    for m in ms:
+        for v in vs:
+            for l in ls:
+                G = get_gbr(m, v, l)
+                B_gbr = np.linalg.inv(G).T @ B # scale by GBR transform
+                A_gbr, N_gbr = get_A_N_from_B(B_gbr)
+                entropy = compute_albedo_entropy(A_gbr)
+                #print(f"Iter {i}: {entropy}")
+                #print(i)
+                if entropy < min_entropy:
+                    print(f"Iter {i}: {entropy}")
+                    min_entropy = entropy
+                    m_best, v_best, l_best = m, v, l
+                i += 1
+
+    G = get_gbr(m_best, v_best, l_best)
+    #print(np.linalg.inv(G).T)
+    #exit()
+    B = np.linalg.inv(G).T @ B # scale by GBR transfo rm
+    #print(B)
+    #exit()
+    L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
+    #B = GBR_flip @ B # or not
+    print(G)
+    return B, L, G
 
 def get_best_gbr_centers(B, t, m_range, v_range, l_range):
     m_edges = np.linspace(m_range[0], m_range[1], t + 1)
@@ -283,44 +324,15 @@ def get_best_gbr_centers(B, t, m_range, v_range, l_range):
     m_range_new = (m_edges[m_best_i], m_edges[m_best_i + 1])
     v_range_new = (v_edges[v_best_i], v_edges[v_best_i + 1])
     l_range_new = (l_edges[l_best_i], l_edges[l_best_i + 1])
-    print(min_entropy)
     return m_range_new, v_range_new, l_range_new
 
-def optimize_albedos_brute_force(B, L, t=5, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
-    ms = np.linspace(m_range[0], m_range[1], t)
-    vs = np.linspace(v_range[0], v_range[1], t)
-    ls = np.linspace(l_range[0]+1e-8, l_range[1], t) # prevent singular value
-    m_best, v_best, l_best = None, None, None
-    min_entropy = np.inf
-    i = 0
-    for m in ms:
-        for v in vs:
-            for l in ls:
-                G = get_gbr(m, v, l)
-                B_gbr = np.linalg.inv(G).T @ B # scale by GBR transform
-                A_gbr, N_gbr = get_A_N_from_B(B_gbr)
-                entropy = compute_albedo_entropy(A_gbr)
-                #print(f"Iter {i}: {entropy}")
-                if entropy < min_entropy:
-                    print(f"Iter {i}: {entropy}")
-                    min_entropy = entropy
-                    m_best, v_best, l_best = m, v, l
-                i += 1
-
-    G = get_gbr(m_best, v_best, l_best)
-    B = np.linalg.inv(G).T @ B # scale by GBR transform
-    L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    #B = GBR_flip @ B # or not
-    print(G)
-    return B, L, G
-
-
-def optimize_albedos_coarse_to_fine(B, L, t=2, levels=5, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
+def optimize_albedos_coarse_to_fine(B, L, t=2, levels=10, m_range=(-5, 5), v_range=(-5, 5), l_range=(0, 5)):
     opt_seq = []
     for level in range(levels):
         print(f"Optimizing albedo level {level} ...")
         m_range, v_range, l_range = get_best_gbr_centers(B, t, m_range, v_range, l_range)
-        #print(m_range, v_range, l_range)
+        print(m_range, v_range, l_range)
+        exit()
     
     m = (m_range[0] + m_range[1]) / 2
     v = (v_range[0] + v_range[1]) / 2
@@ -329,8 +341,10 @@ def optimize_albedos_coarse_to_fine(B, L, t=2, levels=5, m_range=(-5, 5), v_rang
 
     B = np.linalg.inv(G).T @ B # scale by GBR transform
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    B = GBR_flip @ B # or not
+    #B = GBR_flip @ B # or not
     return B, L, G
+
+#  [-0.26315789 -0.26315789  2.36842106]]
 
 config = {
     "cat": {
@@ -343,24 +357,25 @@ config = {
         "integration": "poisson",
         "optimize": True
     },
-    "frog": { # weird behavior
+    "frog": { # weird behavior, with GBR optimazation always fails
         "sigma": 5,
         "integration": "poisson",
         "optimize": True
     }
 }
 
-dataset = "women"
+dataset = "cat"
+optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr="coarse_to_fine")
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
 img = plot_surface(Z, dataset=dataset)
 
-#B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-#    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
-#img = plot_surface(Z, dataset=dataset)
+B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
+img = plot_surface(Z, dataset=dataset)
 
 #A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 

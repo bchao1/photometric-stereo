@@ -20,7 +20,7 @@ GBR_flip = torch.tensor([
     [1, 0, 0],
     [0, 1, 0],
     [0, 0, -1]
-])
+]).float()
 gpu_id = 0
 
 def save_image(img, img_path):
@@ -227,6 +227,7 @@ def read_images_from_folder(data_folder, samples=None):
     return I, (h, w)
 
 def surface_integration(N, h, w, mode="poisson"):
+    N = N.detach().cpu().numpy()
     dx = -N[0] / (N[2] + 1e-8)
     dy = -N[1] / (N[2] + 1e-8)
     dx = dx.reshape(h, w)
@@ -249,13 +250,6 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L, G = optimize_albedos(B, L, optimize_gbr)
 
     A, N = get_A_N_from_B(B)
-
-    # Cast to numpy
-    B = B.detach().cpu().numpy()
-    L = L.detach().cpu().numpy()
-    A = A.detach().cpu().numpy()
-    N = N.detach().cpu().numpy()
-    G = G.detach().cpu().numpy()
 
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
 
@@ -316,7 +310,7 @@ def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l
     #print(B)
     #exit()
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    #B = GBR_flip @ B # or not
+    B = GBR_flip.to(B.device) @ B # or not
     print(G)
     return B, L, G
 
@@ -401,13 +395,14 @@ B, L, A, N, Z, G = solve_photometric_stereo(I, h, w,
 img = plot_surface(Z, title="not optimized", dataset=dataset)
 img.save(f"./results/not_optimized_{dataset}.png")
 
-A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -torch.tensor(Z))
 
 #plt.imshow(Z_normalized, cmap="gray")
 #plt.show()
 #save_image(normalize(I[0].reshape(h, w)), "orig.png")
-save_image(A_normalized, "./results/albedo.png")
-save_image(N_normalized, "./results/normal.png")
-save_image(Z_normalized, "./results/depth.png")
+
+save_image(A_normalized.cpu().numpy(), "./results/albedo.png")
+save_image(N_normalized.cpu().numpy(), "./results/normal.png")
+save_image(Z_normalized.cpu().numpy(), "./results/depth.png")
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

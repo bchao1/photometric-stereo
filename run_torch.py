@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import scipy.ndimage
 from skimage.transform import resize
+import torch
 
 
 from src.cp_hw5 import integrate_poisson, integrate_frankot
@@ -126,13 +127,16 @@ def generate_relighting_seqeunce(B, h, w, mode, N, fps, out_path, loop=0):
         writer.close()
 
 def solve_svd(I):
+    print(I.shape)
     # SVD on I using I = L' dot B model
     # I.shape = (N, P) (luminance matrix)
     # L.shape = (3, N), L'.shape = (N, 3) (light matrix)
     # B.shape = (3, P) (pseudo-normal matrix) = normal times albedo (scaling value)
 
     rank = 3
-    U, S, VH = np.linalg.svd(I, full_matrices=False)
+    U, S, VH = torch.linalg.svd(I, full_matrices=False)
+    print(U.shape, S.shape, VH.shape)
+    exit()
     L_t = U[:, :rank] @ np.diag(np.sqrt(S[:rank]))
     B = np.diag(np.sqrt(S[:rank])) @ VH[:rank, :] # Pseudo-normal matrix
     L = L_t.T # light matrix (3, N)
@@ -218,6 +222,7 @@ def read_images_from_folder(data_folder, samples=None):
         elif len(img.shape) == 2:
             I.append(img.ravel())
     I = np.stack(I) # I.shape = (N, H * W) = (N, P)
+    I = torch.tensor(I) # cast to torch tensor
     return I, (h, w)
 
 def surface_integration(N, h, w, mode="poisson"):

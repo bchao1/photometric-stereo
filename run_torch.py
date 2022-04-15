@@ -376,7 +376,7 @@ config = {
     }
 }
 
-dataset = "cat"
+dataset = "women"
 optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)

@@ -21,6 +21,7 @@ An implementation in `pytorch` is also provided.
 |--|--|--|
 |cat|47.672s|17.282s|
 |women|45.056s|18.270s|
+|frog|
 
 
 # Todo

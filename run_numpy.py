@@ -10,7 +10,7 @@ from skimage.transform import resize
 import time
 
 
-from src.cp_hw5 import integrate_poisson, integrate_frankot
+from src.integration_utils import integrate_poisson, integrate_frankot
 
 GBR_flip = np.array([
     [1, 0, 0],
@@ -74,11 +74,11 @@ def plot_surface(Z, dataset, title, show_plot=True):
     
     surf = ax.plot_surface(x, y, -Z, facecolors=color_shade, rstride=4, cstride=4)
     if dataset == "women":
-        ax.view_init(elev=30, azim=120)
+        ax.view_init(elev=50, azim=120)
     elif dataset == "cat":
         ax.view_init(elev=50, azim=120)
     elif dataset == "frog":
-        ax.view_init(elev=70, azim=120)
+        ax.view_init(elev=50, azim=120)
     # turn off axis 
     plt.axis('off') 
     plt.title(title)
@@ -238,10 +238,11 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
     # Do some processing on B, L (resolving GBR ambiguity)
     B, L, G = optimize_albedos(B, L, optimize_gbr)
+    B = GBR_flip @ B # or not
 
     A, N = get_A_N_from_B(B)
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
-
+    
     return B, L, A, N, Z, G
 
 def get_gbr(m, v, l):
@@ -351,45 +352,44 @@ config = {
     "cat": {
         "sigma": 10,
         "integration": "frankot",
-        "optimize": True
+        "flip_gbr": False
     },
     "women": {
         "sigma": 10,
-        "integration": "poisson",
-        "optimize": True
+        "integration": "frankot",
+        "flip_gbr": False
     },
     "frog": { # weird behavior, with GBR optimazation always fails
-        "sigma": 5,
-        "integration": "poisson",
-        "optimize": True
+        "sigma": 6.5,
+        "integration": "frankot",
+        "flip_gbr": True
     }
 }
 
-dataset = "women"
+dataset = "frog"
 optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
 
 time_start = time.time()
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr, flip_gbr=config[dataset]["flip_gbr"])
 time_spent = time.time() - time_start
 print("Time elapsed:", time_spent)
 img = plot_surface(Z, title="optimized", dataset=dataset)
 img.save(f"./results/numpy/optimized_{dataset}.png")
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None, flip_gbr=config[dataset]["flip_gbr"])
 img = plot_surface(Z, title="not optimized", dataset=dataset)
 img.save(f"./results/numpy/not_optimized_{dataset}.png")
 
-A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+#A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 
-#plt.imshow(Z_normalized, cmap="gray")
-#plt.show()
-#save_image(normalize(I[0].reshape(h, w)), "orig.png")
-save_image(A_normalized, "./results/numpy/albedo.png")
-save_image(N_normalized, "./results/numpy/normal.png")
-save_image(Z_normalized, "./results/numpy/depth.png")
+
+#save_image(A_normalized, f"./results/numpy/albedo_{dataset}.png")
+#save_image(N_normalized, f"./results/numpy/normal_{dataset}.png")
+#save_image(Z_normalized, f"./results/numpy/depth._{dataset}png")
+
 #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

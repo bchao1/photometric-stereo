@@ -238,7 +238,7 @@ def surface_integration(N, h, w, mode="poisson"):
         Z = integrate_frankot(dx, dy)
     return Z
 
-def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True):
+def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True, flip_gbr=False):
     if torch.cuda.is_available():
         torch.cuda.set_device(gpu_id)
         I = I.cuda()
@@ -248,6 +248,11 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
     # Do some processing on B, L (resolving GBR ambiguity)
     B, L, G = optimize_albedos(B, L, optimize_gbr)
+    if flip_gbr:
+        GBR_flip = GBR_flip.to(B.device)
+        B = GBR_flip @ B
+        L = torch.linalg.inv(GBR_flip).T @ L
+
 
     A, N = get_A_N_from_B(B)
 
@@ -355,23 +360,22 @@ def optimize_albedos_coarse_to_fine(B, L, t=2, levels=10, m_range=(-5, 5), v_ran
     #B = GBR_flip @ B # or not
     return B, L, G
 
-#  [-0.26315789 -0.26315789  2.36842106]]
 
 config = {
     "cat": {
         "sigma": 10,
         "integration": "frankot",
-        "optimize": True
+        "flip_gbr": True
     },
     "women": {
         "sigma": 10,
-        "integration": "poisson",
-        "optimize": True
+        "integration": "frankot",
+        "flip_gbr": False
     },
     "frog": { # weird behavior, with GBR optimazation always fails
-        "sigma": 5,
-        "integration": "poisson",
-        "optimize": True
+        "sigma": 6.5,
+        "integration": "frankot",
+        "flip_gbr": True
     }
 }
 
@@ -382,7 +386,7 @@ I, (h, w) = read_images_from_folder(data_folder, None)
 
 time_start = time.time()
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr)
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr, flip_gbr=config[dataset]["flip_gbr"])
 time_spent = time.time() - time_start
 print("Time elapsed:", time_spent)
 
@@ -390,7 +394,7 @@ img = plot_surface(Z, title="optimized", dataset=dataset)
 img.save(f"./results/torch/optimized_{dataset}.png")
 
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None)
+    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None, flip_gbr=config[dataset]["flip_gbr"])
 img = plot_surface(Z, title="not optimized", dataset=dataset)
 img.save(f"./results/torch/not_optimized_{dataset}.png")
 

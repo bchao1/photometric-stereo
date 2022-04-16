@@ -232,13 +232,16 @@ def surface_integration(N, h, w, mode="poisson"):
         Z = integrate_frankot(dx, dy)
     return Z
 
-def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True):
+def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True, flip_gbr=False):
     B, L = solve_svd(I)
 
     B, L = integratibility_normalization(B, L, h, w, gaussian_sigma) # play with different sigma
     # Do some processing on B, L (resolving GBR ambiguity)
     B, L, G = optimize_albedos(B, L, optimize_gbr)
-    B = GBR_flip @ B # or not
+
+    if flip_gbr:
+        B = GBR_flip @ B 
+        L = np.linalg(GBR_flip).T @ L
 
     A, N = get_A_N_from_B(B)
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad

@@ -101,7 +101,16 @@ def integrate_frankot(zx, zy):
     Z = Z[:H,:W]
     return Z
 
-
+def surface_integration(N, h, w, mode="poisson"):
+    dx = -N[0] / (N[2] + 1e-8)
+    dy = -N[1] / (N[2] + 1e-8)
+    dx = dx.reshape(h, w)
+    dy = dy.reshape(h, w)
+    if mode == "poisson":
+        Z = integrate_poisson(dx, dy)
+    elif mode == "frankot":
+        Z = integrate_frankot(dx, dy)
+    return Z
 
 def load_sources():
     S = np.array([[-0.1418,   -0.1804,   -0.9267], \

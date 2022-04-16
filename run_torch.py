@@ -15,6 +15,7 @@ import time
 
 from src.integration import surface_integration
 from src.custom_torch_utils import gaussian_2d
+from src.utils import *
 
 gpu_id = 0
 
@@ -233,17 +234,19 @@ config = {
         "integration": "frankot",
         "flip_gbr": False
     },
-    "frog": { # weird behavior, with GBR optimazation always fails
+    "frog": {
         "sigma": 6.5,
         "integration": "frankot",
         "flip_gbr": True
     }
 }
 
-dataset = "women"
+dataset = "frog"
 optimize_gbr = "brute_force"
 data_folder = f"data/{dataset}"
 I, (h, w) = read_images_from_folder(data_folder, None)
+
+I = torch.tensor(I).float()
 
 time_start = time.time()
 B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 

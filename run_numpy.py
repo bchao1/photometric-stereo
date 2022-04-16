@@ -98,17 +98,6 @@ def normalize_A_N_Z(A, N, Z):
     Z_normalized = normalize(Z)
     return A_normalized, N_normalized, Z_normalized
 
-def surface_integration(N, h, w, mode="poisson"):
-    dx = -N[0] / (N[2] + 1e-8)
-    dy = -N[1] / (N[2] + 1e-8)
-    dx = dx.reshape(h, w)
-    dy = dy.reshape(h, w)
-    if mode == "poisson":
-        Z = integrate_poisson(dx, dy)
-    elif mode == "frankot":
-        Z = integrate_frankot(dx, dy)
-    return Z
-
 def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poisson", optimize_gbr=True, flip_gbr=False):
     B, L = solve_svd(I)
 
@@ -119,7 +108,7 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     if flip_gbr:
         GBR_flip = get_gbr(0, 0, -1)
         B = GBR_flip @ B 
-        L = np.linalg(GBR_flip).T @ L
+        L = np.linalg.inv(GBR_flip).T @ L
 
     A, N = get_A_N_from_B(B)
     Z = surface_integration(N, h, w, integration_mode) # poisson integration is bad
@@ -238,7 +227,7 @@ config = {
         "integration": "frankot",
         "flip_gbr": False
     },
-    "frog": { # weird behavior, with GBR optimazation always fails
+    "frog": {
         "sigma": 6.5,
         "integration": "frankot",
         "flip_gbr": True

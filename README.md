@@ -11,17 +11,18 @@ This repo implements some photometric stereo algorithms. The algorithms can be f
 ![est](./results/result.gif)
 
 ## Resolving GBR ambiguity
-![gbr](./results/gbr_comparison_cat.gif)
+|cat|women|frog|
+|--|--|--|
+|![gbr](./results/compare_cat.gif)|![gbr](./results/compare_women.gif)|![gbr](./results/compare_frog.gif)|
 
-![gbr](./results/gbr_comparison_women.gif)
+## CPU and GPU versions
+Both Numpy and Pytorch implementations are provided. The code is tested on a `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` CPU and a `GeForce GTX 108o Ti` GPU.
 
-## GPU speedup
-An implementation in `pytorch` is also provided.
 |Dataset|Numpy|Pytorch|
 |--|--|--|
-|cat|47.672s|17.282s|
-|women|45.056s|18.270s|
-|frog|
+|cat|93.46s|10.61s|
+|women|71.58s|9.54s|
+|frog|103.13s|10.94s|
 
 
 # Todo

@@ -16,11 +16,6 @@ import time
 from src.integration import surface_integration
 from src.custom_torch_utils import gaussian_2d
 
-GBR_flip = torch.tensor([
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, -1]
-]).float()
 gpu_id = 0
 
 def normalize(arr):
@@ -116,7 +111,7 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     # Do some processing on B, L (resolving GBR ambiguity)
     B, L, G = optimize_albedos(B, L, optimize_gbr)
     if flip_gbr:
-        GBR_flip = GBR_flip.to(B.device)
+        GBR_flip = get_gbr(0, 0, -1, B.device).float()
         B = GBR_flip @ B
         L = torch.linalg.inv(GBR_flip).T @ L
 
@@ -224,7 +219,6 @@ def optimize_albedos_coarse_to_fine(B, L, t=2, levels=10, m_range=(-5, 5), v_ran
 
     B = np.linalg.inv(G).T @ B # scale by GBR transform
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    #B = GBR_flip @ B # or not
     return B, L, G
 
 

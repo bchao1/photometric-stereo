@@ -13,12 +13,6 @@ import time
 from src.integration import surface_integration
 from src.utils import *
 
-GBR_flip = np.array([
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, -1]
-])
-
 
 def normalize(arr):
     _min = np.min(arr.ravel())
@@ -123,6 +117,7 @@ def solve_photometric_stereo(I, h, w, gaussian_sigma=10, integration_mode="poiss
     B, L, G = optimize_albedos(B, L, optimize_gbr)
 
     if flip_gbr:
+        GBR_flip = get_gbr(0, 0, -1)
         B = GBR_flip @ B 
         L = np.linalg(GBR_flip).T @ L
 
@@ -186,7 +181,6 @@ def optimize_albedos_brute_force(B, L, t=20, m_range=(-5, 5), v_range=(-5, 5), l
     #print(B)
     #exit()
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    #B = GBR_flip @ B # or not
     print(G)
     return B, L, G
 
@@ -229,7 +223,6 @@ def optimize_albedos_coarse_to_fine(B, L, t=2, levels=10, m_range=(-5, 5), v_ran
 
     B = np.linalg.inv(G).T @ B # scale by GBR transform
     L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-    #B = GBR_flip @ B # or not
     return B, L, G
 
 #  [-0.26315789 -0.26315789  2.36842106]]

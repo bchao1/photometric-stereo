@@ -16,7 +16,7 @@ This repo implements some photometric stereo algorithms. The algorithms can be f
 |![gbr](./results/compare_cat.gif)|![gbr](./results/compare_women.gif)|![gbr](./results/compare_frog.gif)|
 
 ## CPU and GPU versions
-Both Numpy and Pytorch implementations are provided. The code is tested on a `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` CPU and a `GeForce GTX 108o Ti` GPU.
+Both Numpy and Pytorch implementations are provided. The code is tested on a `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` CPU and a `GeForce GTX 1080 Ti` GPU.
 
 |Dataset|Numpy|Pytorch|
 |--|--|--|

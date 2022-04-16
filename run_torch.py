@@ -13,9 +13,9 @@ import torch.nn.functional as F
 import time
 
 
-from src.integration import surface_integration
-from src.custom_torch_utils import gaussian_2d
-from src.utils import *
+from lib.integration import surface_integration
+from lib.custom_torch_utils import gaussian_2d
+from lib.utils import *
 
 gpu_id = 0
 

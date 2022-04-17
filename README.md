@@ -5,6 +5,8 @@ Estimating albedo, surface normal, depth from multiple illuminated images.
 This repo implements some photometric stereo algorithms. The algorithms can be found the following papers:
 - Shape and Albedo from MUltiple Images using Integrability (Yuille and Snow)
 - Resolving the Generalized Bas-Relief Ambiguity by Entropy Minimization (Alldrin et al.)
+- A Closed-Form Solution to Uncalibrated Photometric Stereo via Diffuse Maxima (Favaro et al.)
+- Self-calibrating Photometric Stereo (Shi et al.)
 
 # Dataset
 [Harvard Photometric Stereo Dataset](http://vision.seas.harvard.edu/qsfs/Data.html)

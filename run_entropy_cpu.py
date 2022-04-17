@@ -234,30 +234,31 @@ config = {
     }
 }
 
-dataset = "frog"
-optimize_gbr = "brute_force"
-data_folder = f"data/{dataset}"
-I, (h, w) = read_images_from_folder(data_folder, None)
+if __name__ == "__main__":
+    dataset = "frog"
+    optimize_gbr = "brute_force"
+    data_folder = f"data/{dataset}"
+    I, (h, w) = read_images_from_folder(data_folder, None)
 
-time_start = time.time()
-B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr, flip_gbr=config[dataset]["flip_gbr"])
-time_spent = time.time() - time_start
-print("Time elapsed:", time_spent)
-img = plot_surface(Z, title="optimized", dataset=dataset)
-img.save(f"./results/numpy/optimized_{dataset}.png")
+    time_start = time.time()
+    B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
+        config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=optimize_gbr, flip_gbr=config[dataset]["flip_gbr"])
+    time_spent = time.time() - time_start
+    print("Time elapsed:", time_spent)
+    img = plot_surface(Z, title="optimized", dataset=dataset)
+    img.save(f"./results/numpy/optimized_{dataset}.png")
 
-B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
-    config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None, flip_gbr=config[dataset]["flip_gbr"])
-img = plot_surface(Z, title="not optimized", dataset=dataset)
-img.save(f"./results/numpy/not_optimized_{dataset}.png")
+    B, L, A, N, Z, G = solve_photometric_stereo(I, h, w, 
+        config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None, flip_gbr=config[dataset]["flip_gbr"])
+    img = plot_surface(Z, title="not optimized", dataset=dataset)
+    img.save(f"./results/numpy/not_optimized_{dataset}.png")
 
-#A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
+    #A_normalized, N_normalized, Z_normalized = normalize_A_N_Z(A, N, -Z)
 
 
-#save_image(A_normalized, f"./results/numpy/albedo_{dataset}.png")
-#save_image(N_normalized, f"./results/numpy/normal_{dataset}.png")
-#save_image(Z_normalized, f"./results/numpy/depth._{dataset}png")
+    #save_image(A_normalized, f"./results/numpy/albedo_{dataset}.png")
+    #save_image(N_normalized, f"./results/numpy/normal_{dataset}.png")
+    #save_image(Z_normalized, f"./results/numpy/depth._{dataset}png")
 
-#generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
+    #generate_relighting_seqeunce(B, h, w, "fixZ", 50, 10, "relight.mp4", loop=2)
 

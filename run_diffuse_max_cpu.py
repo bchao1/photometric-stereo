@@ -19,7 +19,7 @@ I = I.reshape(-1, h, w) # diffuse
 
 # 
 B, L = solve_svd(I.reshape(-1, h * w))
-B, L = integratibility_normalization(B, L, h, w, 10)
+B, L = integratibility_normalization(B, L, h, w, config[dataset]["sigma"])
 #
 
 sigma = 2 # larger sigma, smaller number of LDR peaks
@@ -43,6 +43,10 @@ def get_line_segment(l, b):
     u1 = -b[0] / b[2]
     v1 = -b[1] / b[2]
     return (u0, v0), (u1, v1)
+
+def get_lambda(alpha, n, l):
+    lam = np.sqrt(alpha * (1 - alpha)) * np.abs(l.T @ n) / (np.abs(n[2]) * np.sqrt(l[0]**2 + l[1]**2))
+    return lam
 
 def geometric_median(X, eps=1e-5):
     y = np.mean(X, 0)
@@ -73,7 +77,6 @@ def geometric_median(X, eps=1e-5):
         y = y1
 # 1. geometric median
 # 2. RANSAC
-plt.figure()
 gbr_params = []
 for i in range(1000):
     sampled_lights = np.random.choice(LDR_peaks.shape[0], 2, replace=False)
@@ -95,6 +98,7 @@ for i in range(1000):
 
     (u10, v10), (u11, v11) = get_line_segment(l1, n1)
     (u20, v20), (u21, v21) = get_line_segment(l2, n2)
+
     a1 = (v11 - v10) / (u11 - u10)
     b1 = (u11*v10 - u10*v11) / (u11 - u10)
     a2 = (v21 - v20) / (u21 - u20)
@@ -103,26 +107,35 @@ for i in range(1000):
     u = -(b1 - b2) / (a1 - a2)
     v = (a2*b1 - a1*b2) / (a2 - a1)
 
-    alpha = (u - u11) / (u10 - u11)
-    if alpha < 0 or alpha > 1:
+    alpha1 = (u - u11) / (u10 - u11)
+    alpha2 = (u - u21) / (u20 - u21)
+    if alpha1 < 0 or alpha1 > 1 or alpha2 < 0 or alpha2 > 1:
         continue
     #print(alpha)
-    l = np.sqrt(alpha * (1 - alpha)) * np.abs(l1.T @ n1) / (np.abs(n1[2]) * np.sqrt(l1[0]**2 + l1[1]**2))
-    gbr_param = np.array([u, v, l])
+    lam1 = get_lambda(alpha1, n1, l1)
+    lam2 = get_lambda(alpha2, n2, l2)
+    lam = (lam1 + lam2) * 0.5
+    gbr_param = np.array([u, v, lam])
     gbr_params.append(gbr_param)
-    plt.plot(u, v, "ro")
-#plt.show()
+    #plt.plot(0, lam, "ro")
+
 
 gbr_params = np.stack(gbr_params)
 print(gbr_params.shape)
 u_, v_, l_ = geometric_median(gbr_params)
-u, v, l = -u_/l_, -v_/l_, 1/l_
-G = get_gbr(u, v, l)
+G = get_gbr(u_, v_, l_)
 
-B = np.linalg.inv(G).T @ B # scale by GBR transfo rm
+B = np.linalg.inv(G).T @ B # scale by GBR transform
 L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B
-print(G)
+if config[dataset]["flip_gbr"]:
+    GBR_flip = get_gbr(0, 0, -1)
+    B = GBR_flip @ B 
+    L = np.linalg.inv(GBR_flip).T @ L
+
 A, N = get_A_N_from_B(B)
-Z = surface_integration(N, h, w, "frankot") # poisson integration is bad
+Z = surface_integration(N, h, w, config[dataset]["integration"]) # poisson integration is bad
 plot_surface(Z, title="optimized", dataset=dataset)
-exit()
+
+B, L, A, N, Z, G = solve_photometric_stereo(I.reshape(-1, h*w), h, w, 
+        config[dataset]["sigma"], config[dataset]["integration"], optimize_gbr=None, flip_gbr=config[dataset]["flip_gbr"])
+img = plot_surface(Z, title="not optimized", dataset=dataset)

@@ -10,8 +10,8 @@ from skimage.transform import resize
 import time
 
 
-from lib.integration import surface_integration
-from lib.utils import *
+from custom_func.integration import surface_integration
+from custom_func.utils import *
 
 
 def normalize(arr):

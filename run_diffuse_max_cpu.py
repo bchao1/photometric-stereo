@@ -7,6 +7,7 @@ from lib.utils import read_images_from_folder
 from run_entropy_cpu import *
 import matplotlib.pyplot as plt
 import scipy.ndimage
+import skimage.morphology
 
 
 dataset = "women"
@@ -26,16 +27,23 @@ sigma = 2 # larger sigma, smaller number of LDR peaks
 LDR_peaks = np.zeros_like(I)
 for i in range(I.shape[0]):
     blurred = scipy.ndimage.gaussian_filter(I[i], sigma)
-    lm = scipy.ndimage.filters.maximum_filter(blurred, size=3)
-    LDR_peaks[i] = (blurred == lm)
+    lm = skimage.morphology.local_maxima(blurred).astype(np.int)
+    #lm = scipy.ndimage.filters.maximum_filter(blurred, size=3) # wrong here
+    LDR_peaks[i] = lm
 
 # locations to reject (1 = reject)
-repeated_loc = (LDR_peaks.sum(axis=0) >= 2).astype(int)
+repeated_loc = (LDR_peaks.sum(axis=0, keepdims=True) >= 2).astype(int)
 intensity_threshold = (np.amax(I, axis=(1, 2), keepdims=True) - np.amin(I, axis=(1, 2), keepdims=True)) * 0.5
 low_intensity_loc = (I < intensity_threshold).astype(int) 
 
+fig, ax = plt.subplots(1, 2)
+ax[0].imshow(LDR_peaks[0], cmap="gray")
 # Masked out rejected regions
 LDR_peaks = LDR_peaks * (1 - repeated_loc) * (1 - low_intensity_loc)
+ax[1].imshow(LDR_peaks[0], cmap="gray")
+plt.show()
+
+
 
 def get_line_segment(l, b):
     u0 = (-(l[1]**2)*b[0] + l[0]*l[1]*b[1] + l[0]*l[2]*b[2]) / (b[2] * (l[0]**2 + l[1]**2))
@@ -126,7 +134,7 @@ for i in range(1000):
     lam = (lam1 + lam2) * 0.5
     gbr_param = np.array([u, v, lam1])
     gbr_params.append(gbr_param)
-    plt.plot(u, v, "ro")
+    plt.plot(lam1, lam2, "ro")
 plt.show()
 
 

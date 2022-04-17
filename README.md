@@ -6,6 +6,9 @@ This repo implements some photometric stereo algorithms. The algorithms can be f
 - Shape and Albedo from MUltiple Images using Integrability (Yuille and Snow)
 - Resolving the Generalized Bas-Relief Ambiguity by Entropy Minimization (Alldrin et al.)
 
+# Dataset
+[Harvard Photometric Stereo Dataset](http://vision.seas.harvard.edu/qsfs/Data.html)
+
 # Results
 ## Albedo, normals, and depth estimation
 ![est](./results/result.gif)

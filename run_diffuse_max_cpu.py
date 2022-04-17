@@ -48,6 +48,16 @@ def get_lambda(alpha, n, l):
     lam = np.sqrt(alpha * (1 - alpha)) * np.abs(l.T @ n) / (np.abs(n[2]) * np.sqrt(l[0]**2 + l[1]**2))
     return lam
 
+def solve_ax_b(u0, v0, u1, v1):
+    a = (v0 - v1) / (u0 - u1)
+    b = (u0*v1 - u1*v0) / (u0 - u1)
+    return a, b
+
+def find_intersection(a0, b0, a1, b1):
+    u = -(b0 - b1) / (a0 - a1)
+    v = (a0*b1 - a1*b0) / (a0 - a1)
+    return u, v
+
 def geometric_median(X, eps=1e-5):
     y = np.mean(X, 0)
 
@@ -84,9 +94,11 @@ for i in range(1000):
 
     LDR_loc1 = np.where(sampled_I[0])
     LDR_loc2 = np.where(sampled_I[1])
+    t1 = np.random.choice(len(LDR_loc1[0]))
+    t2 = np.random.choice(len(LDR_loc2[0]))
 
-    p1 = np.random.choice(LDR_loc1[0]), np.random.choice(LDR_loc1[1]) # 1st image
-    p2 = np.random.choice(LDR_loc2[0]), np.random.choice(LDR_loc2[1]) # 2nd image
+    p1 = LDR_loc1[0][t1], LDR_loc1[1][t1]
+    p2 = LDR_loc2[0][t2], LDR_loc2[1][t2]
 
     #plt.imshow(LDR_peaks[0], cmap="gray")
     #plt.show()
@@ -99,13 +111,10 @@ for i in range(1000):
     (u10, v10), (u11, v11) = get_line_segment(l1, n1)
     (u20, v20), (u21, v21) = get_line_segment(l2, n2)
 
-    a1 = (v11 - v10) / (u11 - u10)
-    b1 = (u11*v10 - u10*v11) / (u11 - u10)
-    a2 = (v21 - v20) / (u21 - u20)
-    b2 = (u21*v20 - u20*v21) / (u21 - u20)
+    a1, b1 = solve_ax_b(u10, v10, u11, v11)
+    a2, b2 = solve_ax_b(u20, v20, u21, v21)
 
-    u = -(b1 - b2) / (a1 - a2)
-    v = (a2*b1 - a1*b2) / (a2 - a1)
+    u, v = find_intersection(a1, b1, a2, b2)
 
     alpha1 = (u - u11) / (u10 - u11)
     alpha2 = (u - u21) / (u20 - u21)
@@ -115,15 +124,18 @@ for i in range(1000):
     lam1 = get_lambda(alpha1, n1, l1)
     lam2 = get_lambda(alpha2, n2, l2)
     lam = (lam1 + lam2) * 0.5
-    gbr_param = np.array([u, v, lam])
+    gbr_param = np.array([u, v, lam1])
     gbr_params.append(gbr_param)
-    #plt.plot(0, lam, "ro")
+    plt.plot(u, v, "ro")
+plt.show()
 
 
 gbr_params = np.stack(gbr_params)
 print(gbr_params.shape)
 u_, v_, l_ = geometric_median(gbr_params)
 G = get_gbr(u_, v_, l_)
+
+print(G)
 
 B = np.linalg.inv(G).T @ B # scale by GBR transform
 L = G @ L # L = G @ L. I = L^T @ B = L^T @ G^T @ G^(-T) @ B = L^T @ B

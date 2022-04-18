@@ -241,7 +241,7 @@ config = {
     }
 }
 
-if __name___ == "__main__":
+if __name__ == "__main__":
     dataset = "frog"
     optimize_gbr = "brute_force"
     data_folder = f"data/{dataset}"

@@ -3,11 +3,12 @@ import cvxpy as cp
 import scipy.io
 from scipy.spatial.distance import cdist, euclidean
 
-from lib.utils import read_images_from_folder
+from custom_func.utils import read_images_from_folder
 from run_entropy_cpu import *
 import matplotlib.pyplot as plt
 import scipy.ndimage
 import skimage.morphology
+import skimage.feature
 
 
 dataset = "women"
@@ -27,7 +28,9 @@ sigma = 2 # larger sigma, smaller number of LDR peaks
 LDR_peaks = np.zeros_like(I)
 for i in range(I.shape[0]):
     blurred = scipy.ndimage.gaussian_filter(I[i], sigma)
-    lm = skimage.morphology.local_maxima(blurred).astype(np.int)
+    #lm = skimage.morphology.local_maxima(blurred).astype(int)
+    lm = skimage.feature.peak_local_max(blurred, indices=False).astype(int)
+    lm = skimage.morphology.binary_dilation(lm, np.ones((3, 3))) # 3*3 neighbor
     #lm = scipy.ndimage.filters.maximum_filter(blurred, size=3) # wrong here
     LDR_peaks[i] = lm
 
@@ -37,12 +40,11 @@ intensity_threshold = (np.amax(I, axis=(1, 2), keepdims=True) - np.amin(I, axis=
 low_intensity_loc = (I < intensity_threshold).astype(int) 
 
 fig, ax = plt.subplots(1, 2)
-ax[0].imshow(LDR_peaks[0], cmap="gray")
+ax[0].imshow(LDR_peaks[1], cmap="gray")
 # Masked out rejected regions
 LDR_peaks = LDR_peaks * (1 - repeated_loc) * (1 - low_intensity_loc)
-ax[1].imshow(LDR_peaks[0], cmap="gray")
+ax[1].imshow(LDR_peaks[1], cmap="gray")
 plt.show()
-
 
 
 def get_line_segment(l, b):
